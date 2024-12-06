@@ -11,17 +11,18 @@ random.seed(42)  # for debug
 
 pygame.init()
 
-@dataclass
+@dataclass(kw_only=True)  # TODO add (kw_only=True) to inherit the other with additional members like .color or .pos
 class Sprite:
     img: pygame.Surface
     width: int
     height: int
 
 
+@dataclass(kw_only=True)
 class Bubble(Sprite):
-    pass
+    color: str
 
-
+@dataclass(kw_only=True)
 class Cursor(Sprite):
     pass
 
@@ -52,7 +53,7 @@ class PythonicBubbleSagaApp:
         def get_bubble(color: str):
             path = f"img/sprites/bubble_{color}.png"
             img_ori = pygame.image.load(path)#.convert_alpha()
-            return Bubble(pygame.transform.scale(img_ori, (60, 60)), 60, 60)
+            return Bubble(img=pygame.transform.scale(img_ori, (60, 60)), width=60, height=60, color=color)
         self.bubbles = (get_bubble("blue"),
                         get_bubble("green"),
                         get_bubble("lila"),
@@ -61,7 +62,7 @@ class PythonicBubbleSagaApp:
 
         snake_path = "img/sprites/snake.png"
         snake = pygame.image.load(snake_path)#.convert_alpha()
-        self.cursor = Cursor(pygame.transform.scale(snake, (100, 200)), 100, 200)
+        self.cursor = Cursor(img=pygame.transform.scale(snake, (100, 200)), width=100, height=200)
 
     def draw_bubbles(self, game_board):
         bubble_width = self.bubbles[0].width
