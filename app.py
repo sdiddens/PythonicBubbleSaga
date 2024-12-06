@@ -11,7 +11,8 @@ random.seed(42)  # for debug
 
 pygame.init()
 
-@dataclass(kw_only=True)  # TODO add (kw_only=True) to inherit the other with additional members like .color or .pos
+
+@dataclass(kw_only=True)
 class Sprite:
     img: pygame.Surface
     width: int
@@ -22,12 +23,27 @@ class Sprite:
 class Bubble(Sprite):
     color: str
 
+
 @dataclass(kw_only=True)
 class Cursor(Sprite):
     pass
 
 
+@dataclass(kw_only=True)
+class PlayBubble:
+    bubble: Bubble
+    x: int
+    y: int
+    moving: bool
+    col: int
+
+
 class PythonicBubbleSagaApp:
+
+    margin = 20
+    cursor_y = 400
+
+
 
     def __init__(self):
         # attributes
@@ -38,9 +54,13 @@ class PythonicBubbleSagaApp:
         self.bubbles: Optional[Tuple[Bubble]] = None
         self.bubble_width: int = 60
         self.bubble_height: int = 60
+        self.current_bubble_y = 540
+        self.col_width = self.bubble_width//2
         self.cursor: Optional[Cursor] = None
         self.background: Optional[pygame.Surface] = None
         self.screen = None
+        self.max_rows = 6
+        self.max_cols = 31
         # init pygame
 
         self.load_images()
@@ -67,24 +87,57 @@ class PythonicBubbleSagaApp:
     def draw_bubbles(self, game_board):
         bubble_width = self.bubbles[0].width
         for (coord, bubble) in game_board.items():
-            bubble_x = 20 + coord[0]*(bubble.width//2)
-            bubble_y = coord[1]*bubble.height
-            self.screen.blit(bubble.img, (bubble_x, bubble_y))
+            if bubble:
+                bubble_x = self.margin + coord[0]*(bubble.width//2)
+                bubble_y = coord[1]*bubble.height
+                self.screen.blit(bubble.img, (bubble_x, bubble_y))
+
+    def draw_bubble(self, bubble: PlayBubble):
+        self.screen.blit(bubble.bubble.img, (bubble.x, bubble.y))
 
     def draw_cursor(self, col, bubble_width=60):
-        self.screen.blit(self.cursor.img, (col*(bubble_width//2), 400))
+        self.screen.blit(self.cursor.img, (col*self.col_width, self.cursor_y))
 
     def fill_game_board(self, game_board):
         for key in game_board:
-            game_board[key] = self.bubbles[randint(0, 4)]
+            if key[1] < 4:
+                game_board[key] = self.bubbles[randint(0, 4)]
         return game_board
 
+    def trigger_bubble(self, game_board: dict, play_bubble: PlayBubble) -> (dict, PlayBubble):
+        if play_bubble.moving:
+            return game_board, play_bubble
+
+        play_bubble.moving = True
+
+        pos = [0, self.max_rows]
+        while True:
+            if play_bubble.col % 2 == pos[1] % 2:
+                if game_board[(play_bubble.col, pos[1])]:
+                    pos[1] += 1
+                    pos[0] = play_bubble.col + (-1)**randint(0,1)
+                    break
+            else:
+                if game_board[(play_bubble.col-1, pos[1])] or game_board[(play_bubble.col+1, pos[1])]:
+                    pos[1] += 1
+                    pos[0] = play_bubble.col
+                    break
+            pos[1] -= 1
+
+        game_board[(pos[0], pos[1])] = play_bubble.bubble
+
+        return game_board, play_bubble
+
     def mainloop(self):
-        max_rows = 5
-        max_cols = 31
-        game_board = {(col, row): None for col in range(max_cols) for row in range(max_rows) if row % 2 == col % 2}
+        clock = pygame.time.Clock()
+
+        game_board = {(col, row): None for col in range(self.max_cols) for row in range(self.max_rows+1) if row % 2 == col % 2}
         game_board = self.fill_game_board(game_board)
         cursor_col = 15
+        bubbles = list(self.bubbles)
+
+        play_bubble = PlayBubble(bubble=bubbles[randint(0, len(bubbles) - 1)], x=(cursor_col*self.col_width) + self.margin, y=540, moving=False, col=cursor_col)
+
         while True:
             # Events verarbeiten
             for event in pygame.event.get():
@@ -92,9 +145,11 @@ class PythonicBubbleSagaApp:
                     raise QuitException("Got pygame.QUIT event type")
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_LEFT:
-                        cursor_col = (cursor_col - 1) % max_cols
+                        cursor_col = (cursor_col - 1) % self.max_cols
                     if event.key == pygame.K_RIGHT:
-                        cursor_col = (cursor_col + 1) % max_cols
+                        cursor_col = (cursor_col + 1) % self.max_cols
+                    if event.key == pygame.K_SPACE:
+                        game_board, play_bubble = self.trigger_bubble(game_board, play_bubble)
 
             # Spiellogik hier einfügen (falls erforderlich)
 
@@ -103,12 +158,24 @@ class PythonicBubbleSagaApp:
             self.screen.blit(self.background, (0, 0))
 
             # Zeichnungen und Updates hier einfügen
+
             self.draw_cursor(cursor_col)
+            self.draw_bubble(play_bubble)
             self.draw_bubbles(game_board)
+            if play_bubble.moving:
+                play_bubble.y -= 5
+            else:
+                play_bubble.x = (cursor_col * self.col_width) + self.margin
+                play_bubble.col = cursor_col
+            if play_bubble.y < 0:
+                play_bubble = PlayBubble(bubble=bubbles[randint(0, len(bubbles) - 1)], x=(cursor_col*self.col_width) + self.margin, y=540, moving=False, col=cursor_col)
+
 
 
             # Bildschirm aktualisieren
             pygame.display.flip()
+
+            clock.tick(60)
 
     def main(self):
 
@@ -120,7 +187,6 @@ class PythonicBubbleSagaApp:
 
 
 if __name__ == "__main__":
-
     app = PythonicBubbleSagaApp()
 
     # run mainloop
@@ -131,4 +197,4 @@ if __name__ == "__main__":
     finally:
         # Pygame beenden
         pygame.quit()
-        sys.exit()
+        #sys.exit()
